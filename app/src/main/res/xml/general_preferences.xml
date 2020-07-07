@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.preference.PreferenceCategory>
+
+        <!--    Display name preference-->
+        <androidx.preference.EditTextPreference
+            app:key="@string/key_user_display_name"
+            app:title="Display name"
+            app:useSimpleSummaryProvider="true" />
+        <!--Email address preference-->
+        <androidx.preference.EditTextPreference
+            app:key="@string/key_user_email_address"
+            app:title="Email address"
+            app:useSimpleSummaryProvider="true" />
+    </androidx.preference.PreferenceCategory>
+
+    <!--    Favourite social network preference-->
+    <androidx.preference.ListPreference
+        app:entries="@array/pref_entries_favourite_social"
+        app:entryValues="@array/pref_values_favourite_social"
+        app:key="@string/pref_user_favorite_social"
+        app:title="Favourite social network"
+        app:useSimpleSummaryProvider="true" />
+</androidx.preference.PreferenceScreen>

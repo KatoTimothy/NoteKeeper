@@ -1,0 +1,8 @@
+<androidx.preference.PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+    <Preference
+        app:key="general"
+        app:title="General"
+        app:icon="@drawable/info"
+        app:fragment="android.app.notekeeper.SettingsActivity$GeneralFragment"
+        />
+</androidx.preference.PreferenceScreen>

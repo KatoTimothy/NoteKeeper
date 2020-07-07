@@ -1,0 +1,55 @@
+<resources>
+    <string name="app_name">NoteKeeper</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Home</string>
+    <string name="menu_gallery">Gallery</string>
+    <string name="menu_slideshow">Slideshow</string>
+    <string name="note_title_hint">Note title</string>
+    <string name="note_text_hint">Note text</string>
+    <string name="text_note_title">Note title</string>
+    <string name="text_course_name">Course name</string>
+    <string name="note_icon_description">Indicates a note</string>
+    <string name="course_title">Course title</string>
+    <string name="course">Indicates a the course viewed</string>
+    <string name="note_activity_title">Edit Note</string>
+    <string name="title_activity_settings">SettingsActivity</string>
+
+    <!-- Preference Titles -->
+    <string name="messages_header">Messages</string>
+    <string name="sync_header">Sync</string>
+
+    <!-- Messages Preferences -->
+    <string name="pref_user_display_name">Display name</string>
+    <string name="pref_default_user_display_name">Your name</string>
+
+    <string name="pref_title_email_address">Email address</string>
+    <string name="pref_default_email_address">username@yourhost.com</string>
+
+    <!-- Sync Preferences -->
+    <string name="sync_title">Sync email periodically</string>
+    <string name="attachment_title">Download incoming attachments</string>
+    <string name="attachment_summary_on">Automatically download attachments for incoming emails
+    </string>
+    <string name="attachment_summary_off">Only download attachments when manually requested</string>
+    <string name="title_activity_settings2">SettingsActivity2</string>
+
+    <string name="user_favorite_social">Favourite social network</string>
+
+    <!-- Messages Preferences -->
+    <string name="signature_title">Your signature</string>
+    <string name="reply_title">Default reply action</string>
+    <string name="action_send_as_email">Send as Email</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_next">Next</string>
+    <string name="title_notes">Notes</string>
+    <string name="title_courses">Courses</string>
+    <string name="key_user_display_name">user_display_name</string>
+    <string name="key_user_email_address">user_email_address</string>
+    <string name="pref_user_favorite_social">user_favourite_social</string>
+</resources>
