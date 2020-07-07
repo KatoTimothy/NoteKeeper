@@ -11,6 +11,7 @@ public class DataBaseWorker {
         mDb = db;
     }
 
+    //creates a single row
     private void insertCourse(String course_id, String course_title) {
 
         ContentValues course = new ContentValues();
