@@ -15,12 +15,9 @@ import androidx.appcompat.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Spinner;
-
-import java.util.List;
 
 public class NoteActivity extends AppCompatActivity {
     private final String TAG = getClass().getSimpleName();
@@ -65,33 +62,33 @@ public class NoteActivity extends AppCompatActivity {
         //This gives us a reference to View Model
         mViewModel = viewModelProvider.get(NoteActivityViewModel.class);
 
-        if (mViewModel.mIsNewlyCreated) {
+        if (mViewModel.mIsCreated) {
             Log.d(TAG, "View model is now created");
         } else {
             Log.d(TAG, "View model was destroyed and recreated.");
         }
 
-        //If activity was destroyed along with the view model, then
-        //restore activity state from bundle
-        if (savedInstanceState != null && mViewModel.mIsNewlyCreated)
+        //If activity is destroyed along with the viewModel,
+        //the activity state will be restored from savedInstance state bundle
+        if (savedInstanceState != null && mViewModel.mIsCreated)
+            //restore state from from savedInstanceSate bundle
             mViewModel.restoreState(savedInstanceState);
-        //View Model is no longer a new creation
-        //Implying it is already existing
-        mViewModel.mIsNewlyCreated = false;
 
-//        //get a list of courses from the DataManager Class
-//        List<CourseInfo> courses = DataManager.getInstance().getCourses();
+        //This is a flag to indicate that
+        //the viewModel instance was already created by ViewModelProvider
+        mViewModel.mIsCreated = false;
 
-        //Get references to the Views
+        //Get references to the TextViews
         mTextNoteTitle = findViewById(R.id.text_note_title);
         mTextNoteText = findViewById(R.id.text_note_text);
-        //Obtain reference to spinner widget named 'spinner_courses'
+        //Obtain reference to spinner widget identified by id value  'spinner_courses'
         mSpinnerCourses = findViewById(R.id.spinner_courses);
+
         //Setting up the Cursor Adapter View
         mCourseAdapter = new SimpleCursorAdapter(this, android.R.layout.simple_spinner_item, null,
                 new String[]{CourseInfoEntry.COLUMN_COURSE_TITLE},
                 new int[]{android.R.id.text1}, 0);
-        //setting the view of the dropdown list
+        //setting the layout to be used to display the dropdown of the spinner
         mCourseAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         //Associate the Adapter View with the Spinner
@@ -170,40 +167,36 @@ public class NoteActivity extends AppCompatActivity {
     }
 
     @Override
+    //This is called when the Activity is being recreated after being destroyed for instance
+    //use makes configuration changes to the device like rotating screen, calling the finish() in the program
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        //store state if it exists
-        //to the view model via the view model's saveState() method
+
+        //saves the state bundle if there's any
         if (outState != null) ;
         mViewModel.saveState(outState);
     }
 
+    //Stores the original state values of the note before user interacts with it
     private void saveOriginalStateValues() {
-        //if is new note exit
+        //if user is creating a new note then, simply exit
         if (mIsNewNote)
             return;
-        //save original note info
-        //i.e. courseId, noteTitle and noteText
+        //save original state values of the NoteActivity
+        //courseId, noteTitle and noteText are the state values to be saved
         mViewModel.mOriginalNoteCourseId = mNote.getCourse().getCourseId();
         mViewModel.mOriginalNoteTitle = mNote.getTitle();
         mViewModel.mOriginalNoteText = mNote.getText();
     }
 
 
-    //Reads the existing Notes
-    //displays the in the fields
+    //Retrieves the note values from the cursor and
+    //binds it to the corresponding views
     private void displayNote() {
         //Get  values from the cursor
         String courseId = mNoteCursor.getString(mCourseIdPos);
         String noteTitle = mNoteCursor.getString(mNoteTitlePos);
         String noteText = mNoteCursor.getString(mNoteTextPos);
-
-
-//        //get list of courses from the data manager
-//        List<CourseInfo> courses = DataManager.getInstance().getCourses();
-//        //get course whose course id matches on  from database
-//        CourseInfo course = DataManager.getInstance().getCourse(courseId);
-        //search for position of that course instance from courses list
 
         int courseIndex = getIndexOfCourseId(courseId);
 
@@ -223,25 +216,29 @@ public class NoteActivity extends AppCompatActivity {
         //we want to use it to get the value of the course id
         Cursor cursor = mCourseAdapter.getCursor();
 
-        //get the column index of the courseID
+        //get the column index of the required courseId
         int courseIdPos = cursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_ID);
 
-        //We don't know the where the cursor is position
+        //We don't know the where the cursor position is so
         //we explicitly move the cursor to first row
         boolean more = cursor.moveToFirst();
-        int courseRowIndex = 0;
 
+        //keeps track of the row index as we traverse the rows in the course_info table
+        int courseRowIndex = 0; //start out with the first rows
+
+        //checking the course_info table for the course that matches passed in courseId
         while (more) {
+            //get the courseId in the cursor
             String cursorCourseId = cursor.getString(courseIdPos);
-            //check if the first row has the course we looking for
-            //if true break out of the loop
-            //otherwise we go do the same in the next row
+            //check if this courseId matches the one in the cursor
             if (courseId.equals(cursorCourseId))
                 break;
 
             courseRowIndex++;
+            //move to the next row
             more = cursor.moveToNext();
         }
+        //returns the row index containing the matching courseId
         return courseRowIndex;
     }
 
@@ -273,7 +270,7 @@ public class NoteActivity extends AppCompatActivity {
     private void createNewNote() {
         DataManager dm = DataManager.getInstance();
 
-        //creates new note and return its position
+        //creates new note and return its position in the notes list
         mNoteId = dm.createNewNote();
     }
 
@@ -285,7 +282,7 @@ public class NoteActivity extends AppCompatActivity {
         //Remove the new note
         //otherwise save note
         if (mIsCancelling) {
-            //a simple info logcat msg to show
+            //a simple information logcat msg to show
             //the position of the note we cancelling
             Log.i(TAG, "Cancelling note at position" + mNoteId);
 
@@ -296,7 +293,7 @@ public class NoteActivity extends AppCompatActivity {
                 DataManager.getInstance().removeNote(mNoteId);
             else {
                 //put the old values back
-                storePreviousNoteValues();
+                restoreNoteStateValues();
             }
         } else {
             saveNote();
@@ -305,7 +302,8 @@ public class NoteActivity extends AppCompatActivity {
         Log.d(TAG, "onPause");
     }
 
-    private void storePreviousNoteValues() {
+    //Sets the state values to back to previous ones
+    private void restoreNoteStateValues() {
         CourseInfo course = DataManager.getInstance().getCourse(mViewModel.mOriginalNoteCourseId);
         //set note to previous state values
         mNote.setCourse(course);

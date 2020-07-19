@@ -156,13 +156,14 @@ public class MainActivity extends AppCompatActivity {
     private void loadNotes() {
         SQLiteDatabase db = mDbOpenHelper.getReadableDatabase();
 
-        //specify columns to be returned from database
+        //specify columns to be returned from database when query is performed
         final String[] notesColumns = {
                 NoteInfoEntry.COLUMN_NOTE_TITLE,
                 NoteInfoEntry.COLUMN_COURSE_ID,
                 NoteInfoEntry._ID
         };
-
+        //specifies that data returned be arranged in ASCENDING order by courseId as primary sort
+        // then by note title
         String noteOrderBy = NoteInfoEntry.COLUMN_COURSE_ID + ", " + NoteInfoEntry.COLUMN_NOTE_TITLE;
         //query database
         final Cursor notesCursor = db.query(
@@ -185,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
         TextView textUserName = headerView.findViewById(R.id.text_user_name);
         TextView textEmailAddress = headerView.findViewById(R.id.text_email_address);
 
-        //Reference to shared preferences
+        //Reference to shared preferences file
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
 
         String userName = pref.getString(
