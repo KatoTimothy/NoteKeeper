@@ -13,14 +13,14 @@ public class NoteActivityViewModel extends ViewModel {
 	public static final String ORIGINAL_NOTE_TITLE = "android.app.notekeeper ORIGINAL_NOTE_TITLE";
 	public static final String ORIGINAL_NOTE_TEXT = "android.app.notekeeper ORIGINAL_NOTE_TEXT";
 	
-	//saves the state into bundle
+	//saves the state into a bundle
 	public void saveState(Bundle outState) {
 		//To save state values into the bundle,
 		//They should have names
-		//follow the same idea and convention,
-		//as we passed values to the intent
-		//By creating string constants whose names are app defined
-		//Each of those names are qualified by the applications package name
+		//we follow the same key-value convention,
+		//we used for putting intent extras
+		//By creating string constants whose names are app defined, i.e.
+		//these string value names are qualified by the applications package name
 		//This is done so to avoid collisions of other names used to insert values in the bundle
 		
 		outState.putString(ORIGINAL_COURSE_ID, mOriginalNoteCourseId);

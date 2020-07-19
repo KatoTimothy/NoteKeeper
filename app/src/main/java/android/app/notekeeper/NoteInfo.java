@@ -7,8 +7,15 @@ public final class NoteInfo implements Parcelable {
     private CourseInfo mCourse;
     private String mTitle;
     private String mText;
+    private int mId;
 
-    public NoteInfo(CourseInfo course, String title, String text) {
+    public NoteInfo(int id, CourseInfo course, String title, String text) {
+        mCourse = course;
+        mTitle = title;
+        mText = text;
+        mId = id;
+    }
+    public NoteInfo(CourseInfo course, String title, String text){
         mCourse = course;
         mTitle = title;
         mText = text;
@@ -42,6 +49,10 @@ public final class NoteInfo implements Parcelable {
 
     public void setText(String text) {
         mText = text;
+    }
+
+    public int getId() {
+        return mId;
     }
 
     private String getCompareKey() {
@@ -82,7 +93,7 @@ public final class NoteInfo implements Parcelable {
     }
 
     public static final Parcelable.Creator<NoteInfo> CREATOR =
-            new Parcelable.Creator<NoteInfo>(){
+            new Parcelable.Creator<NoteInfo>() {
 
                 @Override
                 public NoteInfo createFromParcel(Parcel source) {

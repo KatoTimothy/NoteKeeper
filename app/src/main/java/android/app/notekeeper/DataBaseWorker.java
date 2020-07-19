@@ -1,9 +1,11 @@
 package android.app.notekeeper;
 
+import android.app.notekeeper.NoteKeeperDatabaseContract.CourseInfoEntry;
 import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+//Initialises the database
 public class DataBaseWorker {
     private SQLiteDatabase mDb;
 
@@ -11,17 +13,18 @@ public class DataBaseWorker {
         mDb = db;
     }
 
-    //creates a single row
+    //Inserts  a single course into course_info table
     private void insertCourse(String course_id, String course_title) {
 
         ContentValues course = new ContentValues();
 
-        course.put(NoteKeeperDatabaseContract.CourseInfoEntry.COLUMN_COURSE_ID, course_id);
-        course.put(NoteKeeperDatabaseContract.CourseInfoEntry.COLUMN_COURSE_TITLE, course_title);
+        course.put(CourseInfoEntry.COLUMN_COURSE_ID, course_id);
+        course.put(CourseInfoEntry.COLUMN_COURSE_TITLE, course_title);
 
-        mDb.insert(NoteKeeperDatabaseContract.CourseInfoEntry.TABLE_COURSE_INFO, null, course);
+        mDb.insert(CourseInfoEntry.TABLE_COURSE_INFO, null, course);
     }
 
+    //Populates all rows in the course_info table
     public void insertCourses() {
         insertCourse("android_intents", "Android Programming with Intents");
         insertCourse("android_async", "Android Async Programming and Services");
@@ -29,6 +32,18 @@ public class DataBaseWorker {
         insertCourse("java_core", "Java Fundamentals: The Java Core");
     }
 
+    //Populates a single row of note_info table
+    private void insertNote(String note_title, String note_text, String course_id) {
+        ContentValues note = new ContentValues();
+
+        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_NOTE_TITLE, note_title);
+        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_NOTE_TEXT, note_text);
+        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_COURSE_ID, course_id);
+
+        mDb.insert(NoteKeeperDatabaseContract.NoteInfoEntry.TABLE_NOTE_INFO, null, note);
+    }
+
+    //Populates multiple rows of note_info table
     public void insertSampleNotes() {
         insertNote("Dynamic Intent Resolution",
                 "Wow, intents allow components to be resolved at runtime.",
@@ -57,17 +72,6 @@ public class DataBaseWorker {
         insertNote("Serialization",
                 "Remember to include SerialVersionUID to assure version compatibility",
                 "java_core");
-
-
     }
 
-    private void insertNote(String note_title, String note_text, String course_id) {
-        ContentValues note = new ContentValues();
-
-        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_NOTE_TITLE, note_title);
-        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_NOTE_TEXT, note_text);
-        note.put(NoteKeeperDatabaseContract.NoteInfoEntry.COLUMN_COURSE_ID, course_id);
-
-        mDb.insert(NoteKeeperDatabaseContract.NoteInfoEntry.TABLE_NOTE_INFO, null, note);
-    }
 }

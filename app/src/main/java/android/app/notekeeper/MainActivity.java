@@ -1,8 +1,10 @@
 package android.app.notekeeper;
 
 import android.annotation.SuppressLint;
+import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.NinePatchDrawable;
@@ -42,11 +44,6 @@ public class MainActivity extends AppCompatActivity {
     private CourseRecyclerAdapter mCourseRecyclerAdapter;
     private NoteKeeperOpenHelper mDbOpenHelper;
 
-    @Override
-    protected void onDestroy() {
-        mDbOpenHelper.close();
-        super.onDestroy();
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,6 +99,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeDisplayContent() {
+        //Load courses from Database
+        DataManager.loadFromDatabase(mDbOpenHelper);
+
         //Create a recyclerView to use to display
         //the list of courses or notes
         mRecyclerItems = (RecyclerView) findViewById(R.id.list_items);
@@ -116,14 +116,14 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getInteger(R.integer.grid_span));
 
         //set up the Notes Adapter
-        final List<NoteInfo> notes = DataManager.getInstance().getNotes();
-        mNoteRecyclerAdapter = new NoteRecyclerAdapter(this, notes);
+        mNoteRecyclerAdapter = new NoteRecyclerAdapter(this, null);
 
         //set up the Courses Adapter
         final List<CourseInfo> courses = DataManager.getInstance().getCourses();
         mCourseRecyclerAdapter = new CourseRecyclerAdapter(this, courses);
 
         displayNotes();
+
     }
 
     private void displayNotes() {
@@ -132,9 +132,6 @@ public class MainActivity extends AppCompatActivity {
 
         //associate the notes adapter with the recycler view
         mRecyclerItems.setAdapter(mNoteRecyclerAdapter);
-
-        //get sqlite database
-        SQLiteDatabase db = mDbOpenHelper.getReadableDatabase();
     }
 
     private void displayCourses() {
@@ -147,9 +144,35 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        mNoteRecyclerAdapter.notifyDataSetChanged();
-
+        loadNotes(); //re-queries the database to get the latest notes from note_info table
         upDateNavHeader();
+    }
+    @Override
+    protected void onDestroy() {
+        mDbOpenHelper.close();
+        super.onDestroy();
+    }
+
+    private void loadNotes() {
+        SQLiteDatabase db = mDbOpenHelper.getReadableDatabase();
+
+        //specify columns to be returned from database
+        final String[] notesColumns = {
+                NoteInfoEntry.COLUMN_NOTE_TITLE,
+                NoteInfoEntry.COLUMN_COURSE_ID,
+                NoteInfoEntry._ID
+        };
+
+        String noteOrderBy = NoteInfoEntry.COLUMN_COURSE_ID + ", " + NoteInfoEntry.COLUMN_NOTE_TITLE;
+        //query database
+        final Cursor notesCursor = db.query(
+                NoteInfoEntry.TABLE_NOTE_INFO,
+                notesColumns,
+                null, null, null, null, noteOrderBy
+        );
+
+        //associate the cursor with the adapter
+        mNoteRecyclerAdapter.changeCursor(notesCursor);
     }
 
     private void upDateNavHeader() {
@@ -165,15 +188,14 @@ public class MainActivity extends AppCompatActivity {
         //Reference to shared preferences
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
 
-
         String userName = pref.getString(
                 getString(R.string.key_user_display_name), "");
         String emailAddress = pref.getString(
                 getString(R.string.key_user_email_address), "");
 
-		//set the text views in the header
-		textUserName.setText(userName);
-		textEmailAddress.setText(emailAddress);
+        //set the text views in the header
+        textUserName.setText(userName);
+        textEmailAddress.setText(emailAddress);
     }
 
     @Override
