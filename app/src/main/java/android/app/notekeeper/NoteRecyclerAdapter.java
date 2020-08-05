@@ -1,5 +1,6 @@
 package android.app.notekeeper;
 
+import android.app.notekeeper.NoteKeeperDatabaseContract.CourseInfoEntry;
 import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
 import android.content.Context;
 import android.content.Intent;
@@ -19,7 +20,7 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
     private final Context mContext;
     private Cursor mCursor;
     private final LayoutInflater mLayoutInflater;
-    private int mCourseIdPos;
+    private int mCoursePos;
     private int mNoteTitlePos;
     private int mIdPos;
 
@@ -35,15 +36,15 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
         if (mCursor == null)
             return;
         //get column indexes from mCursor
-        mCourseIdPos = mCursor.getColumnIndex(NoteInfoEntry.COLUMN_COURSE_ID);
+        mCoursePos = mCursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_TITLE);
         mNoteTitlePos = mCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TITLE);
         mIdPos = mCursor.getColumnIndex(NoteInfoEntry._ID);
     }
 
     public void changeCursor(Cursor cursor) {
-//        if (cursor != null) {
-//            cursor.close();
-//        }
+        if (cursor != null) {
+            //cursor.close();
+        }
         mCursor = cursor;
         populateColumnPositions();
         //notify RecyclerAdapter when data set changes
@@ -99,14 +100,15 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
      */
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-
+        //We're using the position of view to be display
+        // to move the cursor and get the note at that position
         mCursor.moveToPosition(position);
 
         int id = mCursor.getInt(mIdPos);
-        String courseId = mCursor.getString(mCourseIdPos);
+        String courseId = mCursor.getString(mCoursePos);
         String noteTitle = mCursor.getString(mNoteTitlePos);
 
-        //Associates cursor values to view holder views
+        //Binds cursor values to views in the viewHolder
         holder.mTextCourse.setText(courseId);
         holder.mTextTitle.setText(noteTitle);
         holder.mId = id;

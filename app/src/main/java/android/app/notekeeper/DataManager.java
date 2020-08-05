@@ -39,7 +39,7 @@ public class DataManager {
         };
 
         //querying the course_info table
-        //returns rows with  fields course_id and course_title
+        //returns rows with fields course_id and course_title
         //data returned is sorted by title in ASCENDING order
         final Cursor coursesCursor = db.query(
                 CourseInfoEntry.TABLE_COURSE_INFO,
@@ -47,8 +47,8 @@ public class DataManager {
                 null, null, null, null,
                 CourseInfoEntry.COLUMN_COURSE_TITLE);
 
+        //Populates the mCourses list with info from course_info table
         loadCoursesFromDatabase(coursesCursor);
-
 
         final String[] columnNotes = {
                 NoteInfoEntry._ID,
@@ -69,6 +69,8 @@ public class DataManager {
                 NoteInfoEntry.TABLE_NOTE_INFO,
                 columnNotes,
                 null, null, null, null, noteOrderBy);
+
+        //Populates the mNotes list with data from note_info table
         loadNotesFromDatabase(notesCursor);
     }
 
@@ -108,7 +110,7 @@ public class DataManager {
         cursor.close();
     }
 
-    //Loads up courses list from database
+    //Loads up courses from database into mCourses List
     public static void loadCoursesFromDatabase(Cursor cursor) {
         //We need to obtain the index of each columns
         //Using hard coded the values of the column indexes makes our code fragile
@@ -121,6 +123,7 @@ public class DataManager {
         dm.mCourses.clear();
 
         //Loop through results of each row till the end
+        //adding each row info to the courseInfo list
         while (cursor.moveToNext()) {
             //This extracts the values of course_id and course_title columns
             //for each row/entry

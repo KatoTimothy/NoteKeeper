@@ -1,16 +1,31 @@
 package android.app.notekeeper;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModelProvider;
 
+import android.annotation.SuppressLint;
 import android.app.notekeeper.NoteKeeperDatabaseContract.CourseInfoEntry;
 import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
+import android.app.notekeeper.NoteKeeperProviderContract.Courses;
+import android.app.notekeeper.NoteKeeperProviderContract.Notes;
+import android.content.ContentUris;
+import android.content.ContentValues;
+
+import androidx.loader.content.AsyncTaskLoader;
+import androidx.loader.content.CursorLoader;
+
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 
 import android.util.Log;
 import android.view.Menu;
@@ -19,11 +34,15 @@ import android.widget.EditText;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Spinner;
 
-public class NoteActivity extends AppCompatActivity {
+import java.net.URI;
+
+public class NoteActivity extends AppCompatActivity
+        implements LoaderManager.LoaderCallbacks<Cursor> {
+    public static final int LOADER_NOTES = 0;
+    public static final int LOADER_COURSES = 1;
     private final String TAG = getClass().getSimpleName();
     public static final String NOTE_ID = "android.app.notekeeper NOTE_POSITION";
     public static final int ID_NOT_FOUND = -1;
-    private NoteInfo mNote;
     private boolean mIsNewNote;
     private Spinner mSpinnerCourses;
     private EditText mTextNoteTitle;
@@ -39,6 +58,9 @@ public class NoteActivity extends AppCompatActivity {
     private int mNoteTextPos;
     private int mIdPos;
     private SimpleCursorAdapter mCourseAdapter;
+    private boolean mCoursesQueryFinished;
+    private boolean mNotesQueryFinished;
+    private Uri mNoteUri;
 
     @Override
     protected void onDestroy() {
@@ -62,18 +84,19 @@ public class NoteActivity extends AppCompatActivity {
         //This gives us a reference to View Model
         mViewModel = viewModelProvider.get(NoteActivityViewModel.class);
 
-        if (mViewModel.mIsCreated) {
-            Log.d(TAG, "View model is now created");
-        } else {
-            Log.d(TAG, "View model was destroyed and recreated.");
-        }
 
         //If activity is destroyed along with the viewModel,
         //the activity state will be restored from savedInstance state bundle
-        if (savedInstanceState != null && mViewModel.mIsCreated)
+        if (savedInstanceState != null && mViewModel.mIsCreated) {
             //restore state from from savedInstanceSate bundle
             mViewModel.restoreState(savedInstanceState);
-
+            Log.d(TAG, "View model was destroyed with along with NoteActivity.");
+            if (mViewModel.mIsCreated) {
+                Log.d(TAG, "View model is newly created");
+            } else {
+                Log.d(TAG, "ViewModel already existed.");
+            }
+        }
         //This is a flag to indicate that
         //the viewModel instance was already created by ViewModelProvider
         mViewModel.mIsCreated = false;
@@ -85,90 +108,36 @@ public class NoteActivity extends AppCompatActivity {
         mSpinnerCourses = findViewById(R.id.spinner_courses);
 
         //Setting up the Cursor Adapter View
-        mCourseAdapter = new SimpleCursorAdapter(this, android.R.layout.simple_spinner_item, null,
+        mCourseAdapter = new SimpleCursorAdapter(this,
+                android.R.layout.simple_spinner_item, null,
                 new String[]{CourseInfoEntry.COLUMN_COURSE_TITLE},
                 new int[]{android.R.id.text1}, 0);
-        //setting the layout to be used to display the dropdown of the spinner
+
+        //setting the layout to be used to display each view in dropdown menu of the spinner
         mCourseAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         //Associate the Adapter View with the Spinner
         mSpinnerCourses.setAdapter(mCourseAdapter);
 
-        loadCoursesData();
+        //Load courses
+        LoaderManager.getInstance(this).initLoader(LOADER_COURSES, null, this);
 
         readDisplayStateValues();
         saveOriginalStateValues();
 
-        //If not a new note,
+        //If user is NOT creating a new note,
         //display the note
         if (!mIsNewNote) {
-            loadNoteData();
+            //use loader to load note from database
+            LoaderManager.getInstance(this).initLoader(LOADER_NOTES, null, this);
         }
         Log.d(TAG, "onCreate");
     }
 
-    private void loadCoursesData() {
-        //open database in read mode
-        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-
-        //specify the columns to be return
-        String[] courseColumns = {
-                CourseInfoEntry.COLUMN_COURSE_TITLE,
-                CourseInfoEntry.COLUMN_COURSE_ID,
-                CourseInfoEntry._ID
-        };
-
-        //query the database
-        Cursor courseCursor = db.query(CourseInfoEntry.TABLE_COURSE_INFO, courseColumns,
-                null, null, null, null, CourseInfoEntry.COLUMN_COURSE_TITLE);
-
-        //associate the cursor with CursorAdapter
-        mCourseAdapter.changeCursor(courseCursor);
-    }
-
-    private void loadNoteData() {
-        //Get reference to SQLite database
-        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-
-        //specify the query criteria
-
-        //selection clause
-        String selection = NoteInfoEntry._ID + " = ?";
-
-        //selection values
-        String[] selectionArgs = {Integer.toString(mNoteId)};
-
-        //columns to return when we perform a query
-        String[] noteColumns = {
-                NoteInfoEntry._ID,
-                NoteInfoEntry.COLUMN_COURSE_ID,
-                NoteInfoEntry.COLUMN_NOTE_TITLE,
-                NoteInfoEntry.COLUMN_NOTE_TEXT
-        };
-
-        //perform query
-        mNoteCursor = db.query(
-                NoteInfoEntry.TABLE_NOTE_INFO,
-                noteColumns,
-                selection,
-                selectionArgs,
-                null, null, null);
-
-        //We need column positions to access the column values
-        //in the cursor
-        mIdPos = mNoteCursor.getColumnIndex(NoteInfoEntry._ID);
-        mCourseIdPos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_COURSE_ID);
-        mNoteTitlePos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TITLE);
-        mNoteTextPos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TEXT);
-
-        //move cursor position to the first row in the result
-        mNoteCursor.moveToNext();
-        displayNote();
-    }
-
     @Override
-    //This is called when the Activity is being recreated after being destroyed for instance
-    //use makes configuration changes to the device like rotating screen, calling the finish() in the program
+    //This is called when the Activity has been  destroyed for instance
+    //calling the finish() in the program
+    //allows us to more persistently save activity state in a bundle
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
@@ -182,13 +151,7 @@ public class NoteActivity extends AppCompatActivity {
         //if user is creating a new note then, simply exit
         if (mIsNewNote)
             return;
-        //save original state values of the NoteActivity
-        //courseId, noteTitle and noteText are the state values to be saved
-        mViewModel.mOriginalNoteCourseId = mNote.getCourse().getCourseId();
-        mViewModel.mOriginalNoteTitle = mNote.getTitle();
-        mViewModel.mOriginalNoteText = mNote.getText();
     }
-
 
     //Retrieves the note values from the cursor and
     //binds it to the corresponding views
@@ -209,8 +172,8 @@ public class NoteActivity extends AppCompatActivity {
         mTextNoteText.setText(noteText);
     }
 
-    //This returns the index of the row in the course cursor that
-    //matches the selected course in the current note
+    //This returns the index of the row in the course cursor
+    //We use courseId
     private int getIndexOfCourseId(String courseId) {
         //get the cursor that's associated with the course adapter
         //we want to use it to get the value of the course id
@@ -251,8 +214,9 @@ public class NoteActivity extends AppCompatActivity {
         //for the case when no extra was passed in the intent
         mNoteId = intent.getIntExtra(NOTE_ID, ID_NOT_FOUND);
 
-        //User is creating new note if
+        //We verify that  user is creating new note if
         //value in NOTE_POSITION key was not passed  in the intent extra
+        //and use Default value ID_NOT_FOUND, -1
         mIsNewNote = mNoteId == ID_NOT_FOUND;
 
         if (mIsNewNote) {
@@ -262,61 +226,114 @@ public class NoteActivity extends AppCompatActivity {
         //logcat info message to indicate the position of the note
         Log.i(TAG, "mNotePosition: " + mNoteId);
 
-        //Read the note at the position supplied in the intent extra
-        mNote = DataManager.getInstance().getNotes().get(mNoteId);
     }
 
-    //creates a new note
+    //creates a new note in the database
     private void createNewNote() {
-        DataManager dm = DataManager.getInstance();
+        final ContentValues values = new ContentValues();
 
-        //creates new note and return its position in the notes list
-        mNoteId = dm.createNewNote();
+        //Start out with empty strings
+        values.put(Notes.COURSE_ID, "");
+        values.put(Notes.NOTE_TITLE, "");
+        values.put(Notes.NOTE_TEXT, "");
+
+        @SuppressLint("StaticFieldLeak")
+        AsyncTask task = new AsyncTask() {
+            @SuppressLint("StaticFieldLeak")
+            @Override
+            protected Object doInBackground(Object[] objects) {
+                mNoteUri = getContentResolver().insert(Notes.CONTENT_URI, values);
+                return null;
+            }
+        };
+        task.execute();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        //if user cancels while
-        // Creating a new note then,
-        //Remove the new note
-        //otherwise save note
+        //Checks if user is cancelling the note they're trying to create
         if (mIsCancelling) {
             //a simple information logcat msg to show
             //the position of the note we cancelling
             Log.i(TAG, "Cancelling note at position" + mNoteId);
 
-            //If user is creating new note then,
-            //Remove the new note
-            //else explicitly store the old values back
+            //Checks if  user is attempting to cancel new note creation process,
+            //and delete that new note if true
             if (mIsNewNote)
-                DataManager.getInstance().removeNote(mNoteId);
-            else {
-                //put the old values back
-                restoreNoteStateValues();
-            }
+                //deletes the backing store of that note
+                deleteNoteFromDatabase();
+
         } else {
+            //saves note when user switches away from an Activity
             saveNote();
         }
         //write a debug message
         Log.d(TAG, "onPause");
     }
 
-    //Sets the state values to back to previous ones
-    private void restoreNoteStateValues() {
-        CourseInfo course = DataManager.getInstance().getCourse(mViewModel.mOriginalNoteCourseId);
-        //set note to previous state values
-        mNote.setCourse(course);
-        mNote.setTitle(mViewModel.mOriginalNoteTitle);
-        mNote.setText(mViewModel.mOriginalNoteText);
+    //Deletes a row from note_info table  that has an _ID value is equal to mNoteId
+    private void deleteNoteFromDatabase() {
+
+//        mNoteUri = ContentUris.withAppendedId(Notes.CONTENT_URI, mNoteId);
+
+        @SuppressLint("StaticFieldLeak") AsyncTask task = new AsyncTask() {
+            @Override
+            protected Object doInBackground(Object[] objects) {
+                getContentResolver().delete(mNoteUri, null, null);
+                return null;
+            }
+        };
+        task.execute();
     }
 
     private void saveNote() {
-        //set note course to currently selected course in the spinner
-        mNote.setCourse((CourseInfo) mSpinnerCourses.getSelectedItem());
-        //set note Title and text values to current text values
-        mNote.setTitle(mTextNoteTitle.getText().toString());
-        mNote.setText(mTextNoteText.getText().toString());
+        //Get selected course in the spinner
+        String courseId = selectedCourseId();
+
+        //Obtain text field values
+        String noteTitle = mTextNoteTitle.getText().toString();
+        String noteText = mTextNoteText.getText().toString();
+
+        saveNoteToDatabase(courseId, noteTitle, noteText);
+    }
+
+    //returns courseId from the course_info table,
+    // that matches selected course in the spinner
+    private String selectedCourseId() {
+
+        //get position of selected course in the spinner
+        int selectedCoursePosition = mSpinnerCourses.getSelectedItemPosition();
+
+        //get cursor associated with spinner Adapter
+        Cursor cursor = mCourseAdapter.getCursor();
+
+        cursor.moveToPosition(selectedCoursePosition);
+        //read the value of courseId that corresponds to the selected course in spinner
+        int courseIdPos = cursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_ID);
+        return cursor.getString(courseIdPos);//returns the courseId value
+    }
+
+    //saves note to the database
+    private void saveNoteToDatabase(String courseId, String noteTitle, String noteText) {
+
+        //Provide new values for column in the note_info table
+        final ContentValues values = new ContentValues();
+
+        values.put(Notes.COURSE_ID, courseId);
+        values.put(Notes.NOTE_TITLE, noteTitle);
+        values.put(Notes.NOTE_TEXT, noteText);
+
+        @SuppressLint("StaticFieldLeak")
+        AsyncTask task = new AsyncTask() {
+            @Override
+            @SuppressLint("StaticFieldLeak")
+            protected Object doInBackground(Object[] objects) {
+                getContentResolver().update(mNoteUri, values,  null, null);
+                return null;
+            }
+        };
+        task.execute();
     }
 
     @Override
@@ -337,70 +354,39 @@ public class NoteActivity extends AppCompatActivity {
         if (id == R.id.action_send_mail) {
             sendEmail();
             return true;
+
         } else if (id == R.id.action_cancel) {
-            //if cancelling
             //set the cancelling flag
             mIsCancelling = true;
-            //if true then exit
             //and return to previous activity
             finish();
-        } else if (id == R.id.action_next) {
-            moveNext();
+        }else if(id == R.id.action_send_notification){
+            sendNotification();
         }
         return super.onOptionsItemSelected(item);
     }
 
-    private void moveNext() {
-        saveNote();
-        ++mNoteId;
-        mNote = DataManager.getInstance().getNotes().get(mNoteId);
-        saveOriginalStateValues();
-        displayNote();
+    private void sendNotification() {
 
-        //calls for recreation of the options menu
-        invalidateOptionsMenu();
-    }
-
-    /**
-     * Prepare the Screen's standard options menu to be displayed.  This is
-     * called right before the menu is shown, every time it is shown.  You can
-     * use this method to efficiently enable/disable items or otherwise
-     * dynamically modify the contents.
-     *
-     * <p>The default implementation updates the system menu items based on the
-     * activity's state.  Deriving classes should always call through to the
-     * base class implementation.
-     *
-     * @param menu The options menu as last shown or first initialized by
-     *             onCreateOptionsMenu().
-     * @return You must return true for the menu to be displayed;
-     * if you return false it will not be shown.
-     * @see #onCreateOptionsMenu
-     */
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem item = menu.findItem(R.id.action_next);
-        //get the last index of the note
-        int lastNoteIndex = DataManager.getInstance().getNotes().size() - 1;
-        //Enable the next button until
-        //the last note is reached
-        item.setEnabled(mNoteId < lastNoteIndex);
-        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        Log.i(TAG, "OnResume");
     }
 
+    //Starts an email program and
+    //populates the subject field and body field of the email with
+    //values from  the note title and note text  fields of NoteActivity respectively
     private void sendEmail() {
-        //Get spinner and text input field values
-        //get the selected item in the spinner
-        CourseInfo course = (CourseInfo) mSpinnerCourses.getSelectedItem();
+        //get the selected course  in the spinner
+        String course = getSelectedCourseFromDatabase();
         //get the textNote text value
         String subject = mTextNoteTitle.getText().toString();
         //Prepare email body text
-        String body = "Checkout what I learnt from plural sight \"" + course.getTitle() + "\n" + mTextNoteText.getText().toString();
+        String body = "Checkout what I learnt from plural sight \"" + course +
+                "\n" + mTextNoteText.getText().toString();
 
         //Identify the target that handles ACTION_SEND for 'message/rfc2822' MIME type
         Intent intent = new Intent(Intent.ACTION_SEND);
@@ -408,12 +394,133 @@ public class NoteActivity extends AppCompatActivity {
         intent.setType("message/rfc2822");
 
         //Set up Extras
-        //Specifies email's subject text field text
+        //Specifies text for the email subject
         intent.putExtra(Intent.EXTRA_SUBJECT, subject);
-        //Specify email's body text field text
+        //Species text for the email body
         intent.putExtra(Intent.EXTRA_TEXT, body);
 
-        //start mail activity
+        //starts mailing app chooser
         startActivity(intent);
+    }
+
+    //Returns the selected courseTitle  in the spinner
+    private String getSelectedCourseFromDatabase() {
+        //get position of the selected course in the spinner
+        //This helps to position the cursor in the right place
+        int selectedCoursePosition = mSpinnerCourses.getSelectedItemPosition();
+
+        //get the cursor associated with the spinner adapter
+        Cursor cursor = mCourseAdapter.getCursor();
+
+        cursor.moveToPosition(selectedCoursePosition);
+
+        //get the column index of course_title of note_info table
+        int courseTitlePos = cursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_TITLE);
+
+        return cursor.getString(courseTitlePos);
+    }
+
+    @NonNull
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
+        //Flags that query to note_info table is done
+        mNotesQueryFinished = false;
+        CursorLoader loader = null;
+        if (id == LOADER_NOTES) {
+            //instantiate loader of id LOADER_NOTES
+            loader = createLoaderNotes();
+        } else if (id == LOADER_COURSES) {
+            //instantiate loader of id LOADER_COURSES
+            loader = createLoaderCourses();
+        }
+        return loader;
+    }
+
+    //Returns a cursorLoader containing rows from course_info table arranged by course_title
+    //In ASCENDING order
+    private CursorLoader createLoaderCourses() {
+        //Flags that  query to the course_info table  has finished or not
+        mCoursesQueryFinished = false;
+
+        Uri uri = Courses.CONTENT_URI;
+
+        //specify the columns to be returned when we perform a query
+        String[] courseColumns = {
+                Courses.COURSE_TITLE,
+                Courses.COURSE_ID,
+                Courses._ID
+        };
+
+        return new CursorLoader(this, uri,
+                courseColumns, null, null,
+                Courses.COURSE_TITLE);
+    }
+
+    //Returns a cursorLoader containing rows from note_info table
+    private CursorLoader createLoaderNotes() {
+        //columns to return when we perform a query
+        String[] noteColumns = {
+                Notes._ID,
+                Notes.COURSE_ID,
+                Notes.NOTE_TITLE,
+                Notes.NOTE_TEXT
+        };
+
+        //Construct a note uri
+        mNoteUri = ContentUris.withAppendedId(Notes.CONTENT_URI, mNoteId);
+
+        return new CursorLoader(this, mNoteUri,
+                noteColumns, null, null, null);
+    }
+
+    @Override
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor data) {
+        //check if we have the right Loader
+        if (loader.getId() == LOADER_NOTES)
+            loadFinishedNotes(data);
+        else if (loader.getId() == LOADER_COURSES) {
+            //associate the cursor with CursorAdapter
+            mCourseAdapter.changeCursor(data);
+            mCoursesQueryFinished = true; //indicates the query for courses is finished
+
+            //displays note when both queries to note_info and course_info have finished
+            displayNoteWhenQueryFinished();
+        }
+    }
+
+    private void loadFinishedNotes(Cursor data) {
+        mNoteCursor = data;
+        //We need column positions to access the column values
+        //in the cursor
+        mIdPos = mNoteCursor.getColumnIndex(NoteInfoEntry._ID);
+        mCourseIdPos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_COURSE_ID);
+        mNoteTitlePos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TITLE);
+        mNoteTextPos = mNoteCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TEXT);
+
+        //move cursor position to the first row of  the cursor
+        mNoteCursor.moveToNext();
+        mNotesQueryFinished = true; //This flag indicates query for loading notes has finished
+        displayNoteWhenQueryFinished();
+    }
+
+    //displays note when both queries to load notes and courses is finished
+    private void displayNoteWhenQueryFinished() {
+        if (mCoursesQueryFinished && mNotesQueryFinished)
+            displayNote();
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
+        //check if loader is for notes
+        if (loader.getId() == LOADER_NOTES) {
+            //check if cursor is non null before closing it
+            if (mNoteCursor != null)
+                //resets the mNoteCursor
+                mNoteCursor.close();
+        }
+        //check if loader is for courses
+        else if (loader.getId() == LOADER_COURSES)
+            //reset the mCourseAdapter
+            mCourseAdapter.changeCursor(null);
     }
 }

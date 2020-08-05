@@ -17,7 +17,7 @@
     <string name="note_icon_description">Indicates a note</string>
     <string name="course_title">Course title</string>
     <string name="course">Indicates a the course viewed</string>
-    <string name="note_activity_title">Edit Note</string>
+    <string name="NoteActivityTitle">Edit Note</string>
     <string name="title_activity_settings">SettingsActivity</string>
 
     <!-- Preference Titles -->
@@ -52,4 +52,7 @@
     <string name="key_user_display_name">user_display_name</string>
     <string name="key_user_email_address">user_email_address</string>
     <string name="pref_user_favorite_social">user_favourite_social</string>
+    <string name="note_activity_title">Edit Note</string>
+    <string name="send_notification">Send notification</string>
+    <string name="undo_note">Undo</string>
 </resources>

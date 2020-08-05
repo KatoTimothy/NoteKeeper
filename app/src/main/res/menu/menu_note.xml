@@ -8,14 +8,11 @@
         android:title="@string/action_send_as_email"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_send_notification"
+        android:title="@string/send_notification" />
+    <item
         android:id="@+id/action_cancel"
         android:icon="@android:drawable/ic_menu_revert"
-        android:title="@string/action_cancel"
-        app:showAsAction="ifRoom" />
-    <item
-        android:id="@+id/action_next"
-        android:icon="@android:drawable/ic_media_next"
-        android:title="@string/action_next"
-        android:visible="false"
+        android:title="@string/undo_note"
         app:showAsAction="ifRoom" />
 </menu>

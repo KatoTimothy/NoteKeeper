@@ -16,8 +16,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/colorPrimaryDark"
-            android:theme="@style/AppTheme.NoActionBar"
-            app:popupTheme="@style/AppTheme.NoActionBar"
+            android:theme="@style/AppTheme.AppBarOverlay"
+            app:popupTheme="@style/AppTheme.AppBarOverlay"
             app:subtitleTextAppearance="@style/AppTheme.NoActionBar"
             app:subtitleTextColor="@android:color/background_light"
             app:titleTextColor="@android:color/background_light" />

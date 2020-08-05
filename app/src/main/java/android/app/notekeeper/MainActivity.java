@@ -1,14 +1,14 @@
 package android.app.notekeeper;
 
-import android.annotation.SuppressLint;
-import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
+import android.app.notekeeper.NoteKeeperProviderContract.Courses;
+import android.app.notekeeper.NoteKeeperProviderContract.Notes;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.NinePatchDrawable;
+
+import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Menu;
@@ -19,6 +19,9 @@ import com.google.android.material.navigation.NavigationView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.CursorLoader;
+import androidx.loader.content.Loader;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
 import androidx.navigation.Navigation;
@@ -34,8 +37,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
+    public static final String TAG = "MainActivity";
+    public static final int LOADER_NOTES = 0;
     private AppBarConfiguration mAppBarConfiguration;
     private NoteRecyclerAdapter mNoteRecyclerAdapter;
     private RecyclerView mRecyclerItems;
@@ -72,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         // menu should be considered as top level destinations.
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_notes, R.id.nav_courses)
-                .setDrawerLayout(drawer)
+                .setOpenableLayout(drawer)
                 .build();
 
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
@@ -96,10 +101,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        Log.i(TAG, "onCreate");
     }
 
     private void initializeDisplayContent() {
-        //Load courses from Database
+        //Load notes and courses list in database
         DataManager.loadFromDatabase(mDbOpenHelper);
 
         //Create a recyclerView to use to display
@@ -127,10 +133,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void displayNotes() {
-        //set layout manager to linear
+        //associate a LinearLayoutManager to the RecyclerView
         mRecyclerItems.setLayoutManager(mNotesLayoutManager);
 
-        //associate the notes adapter with the recycler view
+        //associate the notesRecyclerAdapter with the recycler view
         mRecyclerItems.setAdapter(mNoteRecyclerAdapter);
     }
 
@@ -144,36 +150,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        loadNotes(); //re-queries the database to get the latest notes from note_info table
+
+        //re-query the database to get the latest notes from note_info table
+        LoaderManager.getInstance(this).restartLoader(LOADER_NOTES, null, this);
         upDateNavHeader();
+        Log.i(TAG, "onResume");
     }
+
     @Override
     protected void onDestroy() {
         mDbOpenHelper.close();
         super.onDestroy();
-    }
-
-    private void loadNotes() {
-        SQLiteDatabase db = mDbOpenHelper.getReadableDatabase();
-
-        //specify columns to be returned from database when query is performed
-        final String[] notesColumns = {
-                NoteInfoEntry.COLUMN_NOTE_TITLE,
-                NoteInfoEntry.COLUMN_COURSE_ID,
-                NoteInfoEntry._ID
-        };
-        //specifies that data returned be arranged in ASCENDING order by courseId as primary sort
-        // then by note title
-        String noteOrderBy = NoteInfoEntry.COLUMN_COURSE_ID + ", " + NoteInfoEntry.COLUMN_NOTE_TITLE;
-        //query database
-        final Cursor notesCursor = db.query(
-                NoteInfoEntry.TABLE_NOTE_INFO,
-                notesColumns,
-                null, null, null, null, noteOrderBy
-        );
-
-        //associate the cursor with the adapter
-        mNoteRecyclerAdapter.changeCursor(notesCursor);
     }
 
     private void upDateNavHeader() {
@@ -221,5 +208,47 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
         return NavigationUI.navigateUp(navController, mAppBarConfiguration)
                 || super.onSupportNavigateUp();
+    }
+
+    @NonNull
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
+        CursorLoader loader = null;
+        if (id == LOADER_NOTES)
+            loader = loadAllNotes();
+
+        return loader;
+    }
+
+    private CursorLoader loadAllNotes() {
+        //content://android.app.notekeeper.provider/notes_expanded
+        Uri uri = Notes.CONTENT_URI_EXPANDED;
+
+        //specify columns to be returned from database when query is performed
+        final String[] projection = {
+                Notes._ID,
+                Notes.COURSE_TITLE,
+                Notes.NOTE_TITLE
+        };
+
+        //specifies that data returned be arranged in ASCENDING order by courseId as primary sort
+        // then by note title
+        String noteOrderBy = Notes.NOTE_TITLE + ", " + Courses.COURSE_TITLE;
+
+       return new CursorLoader(this, uri, projection, null, null, noteOrderBy);
+    }
+
+    @Override
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor data) {
+        if (loader.getId() == LOADER_NOTES)
+            //associate the cursor with the adapter
+            mNoteRecyclerAdapter.changeCursor(data);
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
+        if (loader.getId() == LOADER_NOTES)
+            //reset cursor
+            mNoteRecyclerAdapter.changeCursor(null);
     }
 }
