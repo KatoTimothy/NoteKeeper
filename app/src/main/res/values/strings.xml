@@ -53,6 +53,10 @@
     <string name="key_user_email_address">user_email_address</string>
     <string name="pref_user_favorite_social">user_favourite_social</string>
     <string name="note_activity_title">Edit Note</string>
-    <string name="send_notification">Send notification</string>
+    <string name="send_notification">Set Reminder</string>
     <string name="undo_note">Undo</string>
+    <string name="channel_description">No sound</string>
+    <string name="channel_name">Note Reminders</string>
+    <string name="notification_content_title">Review note</string>
+    <string name="notification_summary_text">Review note</string>
 </resources>

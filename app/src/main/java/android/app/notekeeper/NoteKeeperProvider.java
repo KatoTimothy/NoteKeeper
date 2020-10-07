@@ -171,7 +171,7 @@ public class NoteKeeperProvider extends ContentProvider {
 
         //creates an array that contains qualified names of table columns equal to _id or course_id
         for (int id = 0; id < projection.length; id++) {
-            columns[id] = projection[id].equals(BaseColumns._ID) || projection[id].equals(CourseIdColumn.COURSE_ID) ?
+            columns[id] = projection[id].equals(BaseColumns._ID) || projection[id].equals(CourseIdColumn.COLUMN_COURSE_ID) ?
                     NoteInfoEntry.getQualifiedColumnName(projection[id]) :
                     projection[id];
         }

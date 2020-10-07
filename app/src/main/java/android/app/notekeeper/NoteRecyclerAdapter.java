@@ -2,6 +2,7 @@ package android.app.notekeeper;
 
 import android.app.notekeeper.NoteKeeperDatabaseContract.CourseInfoEntry;
 import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
+import android.app.notekeeper.NoteKeeperProviderContract.Notes;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -20,57 +21,23 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
     private final Context mContext;
     private Cursor mCursor;
     private final LayoutInflater mLayoutInflater;
-    private int mCoursePos;
-    private int mNoteTitlePos;
-    private int mIdPos;
 
     public NoteRecyclerAdapter(Context context, Cursor cursor) {
         mContext = context;
         mCursor = cursor;
         mLayoutInflater = LayoutInflater.from(mContext);
-
-        populateColumnPositions();
-    }
-
-    private void populateColumnPositions() {
-        if (mCursor == null)
-            return;
-        //get column indexes from mCursor
-        mCoursePos = mCursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_TITLE);
-        mNoteTitlePos = mCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TITLE);
-        mIdPos = mCursor.getColumnIndex(NoteInfoEntry._ID);
     }
 
     public void changeCursor(Cursor cursor) {
-        if (cursor != null) {
-            //cursor.close();
+        //Close old cursor if it exists
+        if (mCursor != null) {
+            cursor.close();
         }
         mCursor = cursor;
-        populateColumnPositions();
-        //notify RecyclerAdapter when data set changes
         notifyDataSetChanged();
+        //notify RecyclerAdapter when data set changes
     }
 
-    /**
-     * Called when RecyclerView needs a new {@link ViewHolder} of the given type to represent
-     * an item.
-     * <p>
-     * This new ViewHolder should be constructed with a new View that can represent the items
-     * of the given type. You can either create a new View manually or inflate it from an XML
-     * layout file.
-     * <p>
-     * The new ViewHolder will be used to display items of the adapter using
-     * {@link #onBindViewHolder(ViewHolder, int, List)}. Since it will be re-used to display
-     * different items in the data set, it is a good idea to cache references to sub views of
-     * the View to avoid unnecessary {@link View#findViewById(int)} calls.
-     *
-     * @param parent   The ViewGroup into which the new View will be added after it is bound to
-     *                 an adapter position.
-     * @param viewType The view type of the new View.
-     * @return A new ViewHolder that holds a View of the given view type.
-     * @see #getItemViewType(int)
-     * @see #onBindViewHolder(ViewHolder, int)
-     */
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -78,57 +45,36 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
         return new ViewHolder(itemView);
     }
 
-    /**
-     * Called by RecyclerView to display the data at the specified position. This method should
-     * update the contents of the {@link ViewHolder#itemView} to reflect the item at the given
-     * position.
-     * <p>
-     * Note that unlike {@link ListView}, RecyclerView will not call this method
-     * again if the position of the item changes in the data set unless the item itself is
-     * invalidated or the new position cannot be determined. For this reason, you should only
-     * use the <code>position</code> parameter while acquiring the related data item inside
-     * this method and should not keep a copy of it. If you need the position of an item later
-     * on (e.g. in a click listener), use {@link ViewHolder#getAdapterPosition()} which will
-     * have the updated adapter position.
-     * <p>
-     * Override {@link #onBindViewHolder(ViewHolder, int, List)} instead if Adapter can
-     * handle efficient partial bind.
-     *
-     * @param holder   The ViewHolder which should be updated to represent the contents of the
-     *                 item at the given position in the data set.
-     * @param position The position of the item within the adapter's data set.
-     */
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        //We're using the position of view to be display
-        // to move the cursor and get the note at that position
-        mCursor.moveToPosition(position);
 
-        int id = mCursor.getInt(mIdPos);
-        String courseId = mCursor.getString(mCoursePos);
-        String noteTitle = mCursor.getString(mNoteTitlePos);
+        // position the cursor to current item position
+        if (mCursor != null) {
+            mCursor.moveToPosition(position);
 
-        //Binds cursor values to views in the viewHolder
-        holder.mTextCourse.setText(courseId);
-        holder.mTextTitle.setText(noteTitle);
-        holder.mId = id;
+            //get column indexes
+            int courseTitlePos = mCursor.getColumnIndex(CourseInfoEntry.COLUMN_COURSE_TITLE);
+            int noteTitlePos = mCursor.getColumnIndex(NoteInfoEntry.COLUMN_NOTE_TITLE);
+
+            //retrieve row values
+            String courseId = mCursor.getString(courseTitlePos);
+            String noteTitle = mCursor.getString(noteTitlePos);
+
+            //Binds cursor values to views in the viewHolder
+            holder.mTextCourse.setText(courseId);
+            holder.mTextTitle.setText(noteTitle);
+        }
     }
 
-    /**
-     * Returns the total number of items in the data set held by the adapter.
-     *
-     * @return The total number of items in this adapter.
-     */
     @Override
     public int getItemCount() {
-        return mCursor == null ? 0 : mCursor.getCount();
+        return mCursor != null ? mCursor.getCount() : 0;
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         //made public so that outer class can refer to them directly
         public final TextView mTextCourse;
         public final TextView mTextTitle;
-        public int mId;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -140,13 +86,27 @@ public class NoteRecyclerAdapter extends RecyclerView.Adapter<NoteRecyclerAdapte
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+
+                    //get position of currently selected item in the recycler view
+                    int currentNotePosition = getAdapterPosition();
+
+                    //retrieve the corresponding  id value  of the selected item  from the database
+                    int currentNoteId = getNoteIdAt(currentNotePosition);
+
+                    //include id value in the intent extra and start the note activity
                     Intent intent = new Intent(mContext, NoteActivity.class);
-                    intent.putExtra(NoteActivity.NOTE_ID, mId);
+                    intent.putExtra(NoteActivity.NOTE_ID, currentNoteId);
                     mContext.startActivity(intent);
                 }
             });
+        }
 
-
+        //retrieves the id value of a note at a given position from the database
+        private int getNoteIdAt(int position) {
+            //move cursor to the desired row position
+            mCursor.moveToPosition(position);
+            int noteIdPos = mCursor.getColumnIndex(Notes._ID);
+            return mCursor.getInt(noteIdPos);
         }
     }
 }

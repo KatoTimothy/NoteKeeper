@@ -2,9 +2,13 @@ package android.app.notekeeper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import android.annotation.SuppressLint;
+import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.notekeeper.NoteKeeperDatabaseContract.CourseInfoEntry;
 import android.app.notekeeper.NoteKeeperDatabaseContract.NoteInfoEntry;
 import android.app.notekeeper.NoteKeeperProviderContract.Courses;
@@ -12,12 +16,10 @@ import android.app.notekeeper.NoteKeeperProviderContract.Notes;
 import android.content.ContentUris;
 import android.content.ContentValues;
 
-import androidx.loader.content.AsyncTaskLoader;
 import androidx.loader.content.CursorLoader;
 
 import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -30,16 +32,19 @@ import androidx.loader.content.Loader;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Spinner;
 
-import java.net.URI;
+import com.google.android.material.snackbar.Snackbar;
 
 public class NoteActivity extends AppCompatActivity
         implements LoaderManager.LoaderCallbacks<Cursor> {
     public static final int LOADER_NOTES = 0;
     public static final int LOADER_COURSES = 1;
+    public static final int NOTIFICATION_ID = 0;
     private final String TAG = getClass().getSimpleName();
     public static final String NOTE_ID = "android.app.notekeeper NOTE_POSITION";
     public static final int ID_NOT_FOUND = -1;
@@ -61,6 +66,7 @@ public class NoteActivity extends AppCompatActivity
     private boolean mCoursesQueryFinished;
     private boolean mNotesQueryFinished;
     private Uri mNoteUri;
+    private ProgressBar mProgressBar;
 
     @Override
     protected void onDestroy() {
@@ -75,6 +81,8 @@ public class NoteActivity extends AppCompatActivity
         setContentView(R.layout.activity_note);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        mProgressBar = findViewById(R.id.progress_bar);
 
         mOpenHelper = new NoteKeeperOpenHelper(this);
 
@@ -170,6 +178,9 @@ public class NoteActivity extends AppCompatActivity
         mTextNoteTitle.setText(noteTitle);
         //set the text of note text field
         mTextNoteText.setText(noteText);
+
+        //Handles details of sending a broadcast
+        CourseEventBroadcastHelper.sendEventBroadcast(this, courseId, "Editing note");
     }
 
     //This returns the index of the row in the course cursor
@@ -233,20 +244,59 @@ public class NoteActivity extends AppCompatActivity
         final ContentValues values = new ContentValues();
 
         //Start out with empty strings
-        values.put(Notes.COURSE_ID, "");
-        values.put(Notes.NOTE_TITLE, "");
-        values.put(Notes.NOTE_TEXT, "");
+        values.put(Notes.COLUMN_COURSE_ID, "");
+        values.put(Notes.COLUMN_NOTE_TITLE, "");
+        values.put(Notes.COLUMN_NOTE_TEXT, "");
 
-        @SuppressLint("StaticFieldLeak")
-        AsyncTask task = new AsyncTask() {
-            @SuppressLint("StaticFieldLeak")
-            @Override
-            protected Object doInBackground(Object[] objects) {
-                mNoteUri = getContentResolver().insert(Notes.CONTENT_URI, values);
-                return null;
-            }
-        };
-        task.execute();
+        @SuppressLint("StaticFieldLeak") AsyncTask<ContentValues, Integer, Uri> insertNoteTask =
+                new AsyncTask<ContentValues, Integer, Uri>() {
+                    @Override
+                    protected void onPreExecute() {
+                        //display the progress bar
+                        mProgressBar.setVisibility(View.VISIBLE);
+                        //set progress to one
+                        mProgressBar.setProgress(1);
+                    }
+
+                    @Override
+                    protected Uri doInBackground(ContentValues... contentValues) {
+                        ContentValues insertValues = contentValues[0];
+
+                        simulateLongRunningTask();
+                        publishProgress(2);
+
+                        simulateLongRunningTask();
+                        publishProgress(3);
+
+                        return getContentResolver().insert(Notes.CONTENT_URI, insertValues);
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(Integer... values) {
+                        mProgressBar.setProgress(values[0]);
+                    }
+
+                    @Override
+                    protected void onPostExecute(Uri uri) {
+                        mNoteUri = uri;
+                        //set visibility of progress bar to none
+                        mProgressBar.setVisibility(View.INVISIBLE);
+                        //display Snackbar
+                        displaySnackBar(mNoteUri.toString());
+                    }
+                };
+        insertNoteTask.execute(values);
+    }
+
+    private void displaySnackBar(String message) {
+        Snackbar.make(mTextNoteText, message, Snackbar.LENGTH_LONG).show();
+    }
+
+    private void simulateLongRunningTask() {
+        try {
+            Thread.sleep(2000);
+        } catch (Exception e) {
+        }
     }
 
     @Override
@@ -320,16 +370,16 @@ public class NoteActivity extends AppCompatActivity
         //Provide new values for column in the note_info table
         final ContentValues values = new ContentValues();
 
-        values.put(Notes.COURSE_ID, courseId);
-        values.put(Notes.NOTE_TITLE, noteTitle);
-        values.put(Notes.NOTE_TEXT, noteText);
+        values.put(Notes.COLUMN_COURSE_ID, courseId);
+        values.put(Notes.COLUMN_NOTE_TITLE, noteTitle);
+        values.put(Notes.COLUMN_NOTE_TEXT, noteText);
 
         @SuppressLint("StaticFieldLeak")
         AsyncTask task = new AsyncTask() {
             @Override
             @SuppressLint("StaticFieldLeak")
             protected Object doInBackground(Object[] objects) {
-                getContentResolver().update(mNoteUri, values,  null, null);
+                getContentResolver().update(mNoteUri, values, null, null);
                 return null;
             }
         };
@@ -345,9 +395,6 @@ public class NoteActivity extends AppCompatActivity
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
@@ -360,14 +407,63 @@ public class NoteActivity extends AppCompatActivity
             mIsCancelling = true;
             //and return to previous activity
             finish();
-        }else if(id == R.id.action_send_notification){
+        } else if (id == R.id.action_set_reminder) {
             sendNotification();
         }
         return super.onOptionsItemSelected(item);
     }
 
     private void sendNotification() {
+        //get Notification manager
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
 
+        Intent notificationIntent = new Intent(this, NoteActivity.class);
+        notificationIntent.putExtra(NoteActivity.NOTE_ID, mNoteId);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+
+        //Intent that starts up a NoteBackupService component
+        Intent noteBackupServiceIntent = new Intent(this, NoteBackupService.class);
+        noteBackupServiceIntent.putExtra(NoteBackupService.EXTRA_ALL_COURSES, NoteBackup.ALL_COURSES);
+        //Pending Intent to start a service component
+        PendingIntent getServicePendingIntent = PendingIntent.getService(
+                this,
+                0,
+                noteBackupServiceIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+
+        //create notification
+        Notification notification = new NotificationCompat.Builder(this, NoteKeeperApp.CHANNEL_ID)
+                //set small icon
+                .setSmallIcon(R.drawable.ic_note)
+                //set title
+                .setContentTitle(getString(R.string.notification_content_title))
+                //set text
+                .setContentText(mTextNoteText.getText())
+                //set priority
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+                //set up expanded view notification
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .setBigContentTitle(mTextNoteTitle.getText())
+                        .bigText(mTextNoteText.getText())
+                        .setSummaryText(getString(R.string.notification_summary_text))
+                )
+                .setContentIntent(pendingIntent)
+
+                //starts the MainActivity component
+                .addAction(0, "REVIEW ALL NOTES", PendingIntent.getActivity(this, 0, new Intent(this,
+                        MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT))
+
+                //starts the NoteBackupService component to backup all notes
+                .addAction(0, "BACKUP ALL NOTES", getServicePendingIntent)
+                .build();
+        //displays notification
+        notificationManager.notify(NOTIFICATION_ID, notification);
     }
 
     @Override
@@ -447,10 +543,9 @@ public class NoteActivity extends AppCompatActivity
         //specify the columns to be returned when we perform a query
         String[] courseColumns = {
                 Courses.COURSE_TITLE,
-                Courses.COURSE_ID,
+                Courses.COLUMN_COURSE_ID,
                 Courses._ID
         };
-
         return new CursorLoader(this, uri,
                 courseColumns, null, null,
                 Courses.COURSE_TITLE);
@@ -461,9 +556,9 @@ public class NoteActivity extends AppCompatActivity
         //columns to return when we perform a query
         String[] noteColumns = {
                 Notes._ID,
-                Notes.COURSE_ID,
-                Notes.NOTE_TITLE,
-                Notes.NOTE_TEXT
+                Notes.COLUMN_COURSE_ID,
+                Notes.COLUMN_NOTE_TITLE,
+                Notes.COLUMN_NOTE_TEXT
         };
 
         //Construct a note uri

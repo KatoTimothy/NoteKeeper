@@ -3,18 +3,27 @@
     package="android.app.notekeeper">
 
     <application
+        android:name=".NoteKeeperApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <service
+            android:name=".NoteUploaderJobService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <service
+            android:name=".NoteBackupService"
+            android:exported="true" />
+
         <provider
             android:name=".NoteKeeperProvider"
             android:authorities="android.app.notekeeper.provider"
             android:enabled="true"
-            android:exported="true">
-        </provider>
+            android:exported="true" />
 
         <activity
             android:name=".SettingsActivity"
@@ -37,6 +46,7 @@
         <activity
             android:name=".NoteActivity"
             android:label="@string/note_activity_title"
+            android:launchMode="standard"
             android:parentActivityName=".MainActivity"
             android:theme="@style/AppTheme.NoActionBar">
             <meta-data

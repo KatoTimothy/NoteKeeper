@@ -1,13 +1,18 @@
 package android.app.notekeeper;
 
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
 import android.app.notekeeper.NoteKeeperProviderContract.Courses;
 import android.app.notekeeper.NoteKeeperProviderContract.Notes;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PersistableBundle;
+import android.os.StrictMode;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,12 +40,12 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
     public static final String TAG = "MainActivity";
     public static final int LOADER_NOTES = 0;
+    public static final int LOADER_COURSES = 2;
+    public static final int NOTE_UPLOADER_JOB_ID = 1;
     private AppBarConfiguration mAppBarConfiguration;
     private NoteRecyclerAdapter mNoteRecyclerAdapter;
     private RecyclerView mRecyclerItems;
@@ -56,6 +61,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        enableThreadPolicy();
 
         mDbOpenHelper = new NoteKeeperOpenHelper(this);
 
@@ -76,8 +83,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_notes, R.id.nav_courses)
-                .setOpenableLayout(drawer)
+
+                R.id.nav_notes, R.id.nav_courses).setOpenableLayout(drawer)
                 .build();
 
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
@@ -104,9 +111,23 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         Log.i(TAG, "onCreate");
     }
 
+    private void enableThreadPolicy() {
+        if (BuildConfig.DEBUG) {//Only run on debug build mode NOT production build
+
+            //Create a thread policy
+            StrictMode.ThreadPolicy threadPolicy = new StrictMode.ThreadPolicy.Builder()
+                    //detect all operations
+                    .detectAll()
+                    //enforce penalties
+                    .penaltyLog()
+                    .build();
+
+            //set thread policy
+            StrictMode.setThreadPolicy(threadPolicy);
+        }
+    }
+
     private void initializeDisplayContent() {
-        //Load notes and courses list in database
-        DataManager.loadFromDatabase(mDbOpenHelper);
 
         //Create a recyclerView to use to display
         //the list of courses or notes
@@ -124,9 +145,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         //set up the Notes Adapter
         mNoteRecyclerAdapter = new NoteRecyclerAdapter(this, null);
 
-        //set up the Courses Adapter
-        final List<CourseInfo> courses = DataManager.getInstance().getCourses();
-        mCourseRecyclerAdapter = new CourseRecyclerAdapter(this, courses);
+        mCourseRecyclerAdapter = new CourseRecyclerAdapter(this, null);
 
         displayNotes();
 
@@ -141,6 +160,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     private void displayCourses() {
+        //Load courses from database
+        LoaderManager.getInstance(this).initLoader(LOADER_COURSES, null, this);
+
         //set the layout manager to grid
         mRecyclerItems.setLayoutManager(mCoursesLayoutManager);
         //associate the courses adapter with recycler view
@@ -199,8 +221,40 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         if (id == R.id.action_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
             return true;
-        }
+        } else if (id == R.id.action_backup_notes) {
+            backupNotes();
+        } else if (id == R.id.action_upload_notes)
+            scheduleNoteUpload();
         return super.onOptionsItemSelected(item);
+    }
+
+    private void scheduleNoteUpload() {
+        //Specify component that will do the note upload job
+        ComponentName componentName = new ComponentName(this, NoteUploaderJobService.class);
+
+        //Persistable bundle
+        PersistableBundle extras = new PersistableBundle();
+
+        extras.putString(NoteUploaderJobService.EXTRA_DATA_URI, Notes.CONTENT_URI.toString());
+
+        //Build the JobInfo required to do the job
+        JobInfo jobInfo = new JobInfo.Builder(NOTE_UPLOADER_JOB_ID, componentName)
+                //Job requires any network connection
+//                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                //set extras
+                .setExtras(extras)
+                .build();
+
+        //Schedule the Job
+        JobScheduler jobScheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
+        jobScheduler.schedule(jobInfo);
+    }
+
+    private void backupNotes() {
+        //TODO: backup notes service
+        Intent intent = new Intent(this, NoteBackupService.class);
+        intent.putExtra(NoteBackupService.EXTRA_ALL_COURSES, NoteBackup.ALL_COURSES);
+        startService(intent);
     }
 
     @Override
@@ -214,10 +268,28 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
         CursorLoader loader = null;
-        if (id == LOADER_NOTES)
+        if (id == LOADER_NOTES) {
             loader = loadAllNotes();
-
+        } else if (id == LOADER_COURSES) {
+            loader = loadAllCourses();
+        }
         return loader;
+    }
+
+    private CursorLoader loadAllCourses() {
+        //content://android.app.notekeeper.provider/courses
+        Uri uri = Courses.CONTENT_URI;
+
+        //projection
+        final String[] projection = {
+                Courses._ID,
+                Courses.COURSE_TITLE
+        };
+
+        //orderBy course title
+        final String orderBy = Courses.COURSE_TITLE;
+
+        return new CursorLoader(this, uri, projection, null, null, orderBy);
     }
 
     private CursorLoader loadAllNotes() {
@@ -228,14 +300,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         final String[] projection = {
                 Notes._ID,
                 Notes.COURSE_TITLE,
-                Notes.NOTE_TITLE
+                Notes.COLUMN_NOTE_TITLE
         };
 
         //specifies that data returned be arranged in ASCENDING order by courseId as primary sort
         // then by note title
-        String noteOrderBy = Notes.NOTE_TITLE + ", " + Courses.COURSE_TITLE;
+        String noteOrderBy = Notes.COLUMN_NOTE_TITLE + ", " + Courses.COURSE_TITLE;
 
-       return new CursorLoader(this, uri, projection, null, null, noteOrderBy);
+        return new CursorLoader(this, uri, projection, null, null, noteOrderBy);
     }
 
     @Override
@@ -243,6 +315,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         if (loader.getId() == LOADER_NOTES)
             //associate the cursor with the adapter
             mNoteRecyclerAdapter.changeCursor(data);
+        else if (loader.getId() == LOADER_COURSES)
+            //associate the cursor with courses adapter
+            mCourseRecyclerAdapter.changeCursor(data);
     }
 
     @Override
@@ -250,5 +325,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         if (loader.getId() == LOADER_NOTES)
             //reset cursor
             mNoteRecyclerAdapter.changeCursor(null);
+        else if (loader.getId() == LOADER_COURSES)
+            mCourseRecyclerAdapter.changeCursor(null);
     }
 }

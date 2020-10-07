@@ -17,7 +17,7 @@ public final class NoteKeeperProviderContract {
 
     //Exposes column that describes the course title
     protected interface CourseIdColumn {
-        public static String COURSE_ID = "course_id";
+        public static String COLUMN_COURSE_ID = "course_id";
     }
 
     //Exposes column  that describes a course
@@ -27,8 +27,8 @@ public final class NoteKeeperProviderContract {
 
     //Exposes columns that describe a note
     protected interface NotesColumns {
-        public static final String NOTE_TITLE = "note_title";
-        public static final String NOTE_TEXT = "note_text";
+        public static final String COLUMN_NOTE_TITLE = "note_title";
+        public static final String COLUMN_NOTE_TEXT = "note_text";
     }
 
     //Exposes information that describes a course
